@@ -34,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
 
     searchProvider = context.read();
+    _focusNode.requestFocus();
     _focusNode.addListener(() {
       setState(() => _hasFocus = _focusNode.hasFocus);
     });
@@ -92,22 +93,6 @@ class _SearchScreenState extends State<SearchScreen> {
               onSuffixTap: _resetSearch,
             ),
           ),
-          if (_hasFocus)
-            Padding(
-              padding: const EdgeInsets.only(left: 12.0),
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                minSize: 0,
-                onPressed: () {
-                  _resetSearch();
-                  _focusNode.unfocus();
-                },
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.white.withOpacity(.7)),
-                ),
-              ),
-            ),
         ],
       ),
     );

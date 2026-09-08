@@ -181,19 +181,17 @@ class _GenreDetailsScreenState extends State<GenreDetailsScreen> {
                           ? const SizedBox.shrink()
                           : PlayableListHeader(
                               playables: displayedSongs,
+                              scrollController: _scrollController,
+                              rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                               onSearchQueryChanged: (query) {
                                 setState(() => _searchQuery = query);
                               },
                             ),
                     ),
-                    SliverPadding(
-                      padding: EdgeInsets.only(
-                        right: showScrollbar ? alphabetScrollbarWidth : 0,
-                      ),
-                      sliver: SliverPlayableList(
-                        playables: displayedSongs,
-                        listContext: PlayableListContext.genre,
-                      ),
+                    SliverPlayableList(
+                      playables: displayedSongs,
+                      listContext: PlayableListContext.genre,
+                      rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                     ),
                     if (_loading)
                       SliverToBoxAdapter(

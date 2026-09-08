@@ -5,6 +5,7 @@ import 'package:app/extensions/extensions.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/ui/placeholders/placeholders.dart';
 import 'package:app/ui/widgets/widgets.dart';
+import 'package:app/utils/features.dart';
 import 'package:app/values/values.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' hide AppBar;
@@ -50,9 +51,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final supportsCustomOrder = Feature.customFavoritesOrder.isSupported();
     var sortConfig = AppState.get(
       'favorites.sort',
-      PlayableSortConfig(field: 'title', order: SortOrder.asc),
+      PlayableSortConfig(
+        field: supportsCustomOrder ? 'position' : 'title',
+        order: SortOrder.asc,
+      ),
     )!;
 
     final emptyWidget = SliverFillRemaining(
@@ -65,7 +70,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               const Icon(
-                CupertinoIcons.heart,
+                CupertinoIcons.star,
                 size: 56.0,
                 color: Colors.grey,
               ),
@@ -85,7 +90,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 5.0),
                         child: Icon(
-                          CupertinoIcons.heart_solid,
+                          CupertinoIcons.star_fill,
                           size: 16.0,
                         ),
                       ),
@@ -115,6 +120,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             final songs =
                 provider.playables.$sort(sortConfig).$filter(_searchQuery);
 
+            final showScrollbar = AlphabetScrollbar.shouldShow(itemCount: songs.length, sortField: sortConfig.field, nameSortField: 'title');
+
             return PullToRefresh(
               onRefresh: () {
                 return _loading
@@ -136,7 +143,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 provider.playables),
                             actions: [
                               SortButton(
-                                fields: ['title', 'artist_name', 'created_at'],
+                                fields: [
+                                  if (supportsCustomOrder) 'position',
+                                  'title',
+                                  'artist_name',
+                                  'created_at'
+                                ],
                                 currentField: sortConfig.field,
                                 currentOrder: sortConfig.order,
                                 onMenuItemSelected: (_sortConfig) {
@@ -149,6 +161,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           SliverToBoxAdapter(
                             child: PlayableListHeader(
                               playables: songs,
+                              scrollController: _scrollController,
+                              rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                               onSearchQueryChanged: (String query) {
                                 setState(() => _searchQuery = query);
                               },
@@ -157,13 +171,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           SliverPlayableList(
                             playables: songs,
                             listContext: PlayableListContext.favorites,
+                            rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                             onDismissed: provider.unlike,
-                            dismissIcon: const Icon(CupertinoIcons.heart_slash),
+                            dismissIcon: const Icon(CupertinoIcons.star_slash),
                           ),
                           const BottomSpace(),
                         ],
                 ),
-                if (AlphabetScrollbar.shouldShow(itemCount: songs.length, sortField: sortConfig.field, nameSortField: 'title'))
+                if (showScrollbar)
                   AlphabetScrollbar(
                     labels: songs.map((s) => s.title).toList(),
                     scrollController: _scrollController,

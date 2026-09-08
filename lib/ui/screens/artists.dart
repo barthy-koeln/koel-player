@@ -4,6 +4,7 @@ import 'package:app/models/models.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/router.dart';
 import 'package:app/ui/placeholders/artists_screen_placeholder.dart';
+import 'package:app/ui/screens/artist_action_sheet.dart';
 import 'package:app/ui/widgets/widgets.dart';
 import 'package:app/values/values.dart';
 import 'package:flutter/cupertino.dart';
@@ -138,7 +139,7 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
                       ),
                       SliverPadding(
                         padding: EdgeInsets.only(
-                          right: showScrollbar ? alphabetScrollbarWidth : 0,
+                          right: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                         ),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate((
@@ -190,7 +191,7 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
   }
 }
 
-class ArtistRow extends StatelessWidget {
+class ArtistRow extends StatefulWidget {
   final Artist artist;
   final AppRouter router;
 
@@ -198,13 +199,21 @@ class ArtistRow extends StatelessWidget {
       : super(key: key);
 
   @override
+  State<ArtistRow> createState() => _ArtistRowState();
+}
+
+class _ArtistRowState extends State<ArtistRow> {
+  @override
   Widget build(BuildContext context) {
+    final artist = widget.artist;
+
     return Card(
       child: InkWell(
-        onTap: () => router.gotoArtistDetailsScreen(
+        onTap: () => widget.router.gotoArtistDetailsScreen(
           context,
           artistId: artist.id,
         ),
+        onLongPress: () => showArtistActionSheet(context, artist: artist),
         child: ListTile(
           shape: Border(bottom: Divider.createBorderSide(context)),
           leading: AlbumArtistThumbnail.sm(entity: artist, asHero: true),

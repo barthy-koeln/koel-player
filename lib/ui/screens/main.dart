@@ -5,9 +5,13 @@ import 'package:app/constants/constants.dart';
 import 'package:app/enums.dart';
 import 'package:app/main.dart';
 import 'package:app/mixins/stream_subscriber.dart';
+import 'package:app/models/models.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/ui/screens/screens.dart';
 import 'package:app/ui/widgets/widgets.dart';
+import 'package:app/utils/quick_actions.dart';
+import 'package:app/utils/route_state.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -22,15 +26,18 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with StreamSubscriber {
   static const tabBarHeight = 60.0;
-  int _selectedIndex = 0;
+  static const _searchTabIndex = 1;
+  late int _selectedIndex;
   var _isOffline = AppState.get('mode', AppMode.online) == AppMode.offline;
 
   final _navigatorKeys = List.generate(
     3,
     (_) => GlobalKey<NavigatorState>(),
   );
+
+  late final List<RouteStateObserver> _routeObservers;
 
   static const List<Widget> _widgetOptions = [
     const HomeScreen(),
@@ -43,6 +50,7 @@ class _MainScreenState extends State<MainScreen> {
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
     } else {
       setState(() => _selectedIndex = index);
+      RouteState.setTabIndex(index);
     }
   }
 
@@ -50,12 +58,134 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
 
+    RouteState.load();
+    _selectedIndex = RouteState.tabIndex;
+    _routeObservers = List.generate(
+      3,
+      (i) => RouteStateObserver(tabIndex: i),
+    );
+
     audioHandler.init(
       playableProvider: context.read<PlayableProvider>(),
       downloadProvider: context.read<DownloadProvider>(),
     );
 
     context.read<DownloadSyncProvider>().scheduleSync();
+
+    _setUpQuickActions();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreRoutes();
+
+      final pendingAction = quickActions.consumePendingAction();
+      if (pendingAction != null) _handleQuickAction(pendingAction);
+    });
+  }
+
+  @override
+  void dispose() {
+    unsubscribeAll();
+    super.dispose();
+  }
+
+  void _setUpQuickActions() {
+    void refreshShortcuts(MediaItem? item) {
+      quickActions.setShortcuts(
+        recentSubtitle: KoelQuickActions.recentSubtitle(
+          artist: item?.artist,
+          title: item?.title,
+        ),
+      );
+    }
+
+    refreshShortcuts(audioHandler.mediaItem.value);
+    subscribe(audioHandler.mediaItem.listen(refreshShortcuts));
+    subscribe(quickActions.actions.listen(_handleQuickAction));
+  }
+
+  Future<void> _handleQuickAction(String type) async {
+    switch (type) {
+      case KoelQuickActions.search:
+        _gotoSearchAndFocus();
+        break;
+      case KoelQuickActions.playFavorites:
+        final favoriteProvider = context.read<FavoriteProvider>();
+        await _shufflePlay(() => favoriteProvider.fetch());
+        break;
+      case KoelQuickActions.playDownloaded:
+        final downloadProvider = context.read<DownloadProvider>();
+        await _shufflePlay(() async => downloadProvider.playables);
+        break;
+      case KoelQuickActions.playRecent:
+        await _resumeQueue();
+        break;
+    }
+  }
+
+  void _gotoSearchAndFocus() {
+    if (_selectedIndex != _searchTabIndex) {
+      setState(() => _selectedIndex = _searchTabIndex);
+      RouteState.setTabIndex(_searchTabIndex);
+    }
+    quickActions.requestSearchFocus();
+  }
+
+  Future<void> _shufflePlay(
+      Future<List<Playable>> Function() loadPlayables) async {
+    try {
+      final playables = await loadPlayables();
+      if (playables.isNotEmpty) {
+        await audioHandler.replaceQueue(playables, shuffle: true);
+      }
+    } catch (_) {
+      // A quick action fails quietly (e.g. a favourites fetch while offline).
+    }
+  }
+
+  Future<void> _resumeQueue() async {
+    try {
+      // On a cold launch the persisted queue is restored asynchronously, so
+      // wait briefly for it before resuming.
+      if (audioHandler.queue.value.isEmpty) {
+        await audioHandler.queue
+            .firstWhere((items) => items.isNotEmpty)
+            .timeout(const Duration(seconds: 5), onTimeout: () => <MediaItem>[]);
+      }
+
+      if (audioHandler.queue.value.isNotEmpty) await audioHandler.play();
+    } catch (_) {
+      // A quick action fails quietly.
+    }
+  }
+
+  void _restoreRoutes() {
+    // Take a snapshot of the persisted stacks, then clear them.
+    // The observer's didPush calls will re-populate them as routes are pushed.
+    final savedStacks = <int, List<RouteEntry>>{};
+    for (var tab = 0; tab < 3; tab++) {
+      savedStacks[tab] = List.of(RouteState.stackFor(tab));
+    }
+    RouteState.clear();
+    RouteState.setTabIndex(_selectedIndex);
+
+    for (var tab = 0; tab < 3; tab++) {
+      final stack = savedStacks[tab]!;
+      final navigator = _navigatorKeys[tab].currentState;
+      if (navigator == null || stack.isEmpty) continue;
+
+      for (final entry in stack) {
+        final screen = entry.buildScreen();
+        if (screen == null) {
+          debugPrint('RouteState: unknown route "${entry.name}", skipping');
+          continue;
+        }
+
+        navigator.push(CupertinoPageRoute(
+          settings: RouteSettings(name: entry.name, arguments: entry.argument),
+          builder: (_) => screen,
+        ));
+      }
+    }
   }
 
   BottomNavigationBarItem tabBarItem({
@@ -102,6 +232,7 @@ class _MainScreenState extends State<MainScreen> {
                   tabBuilder: (_, index) {
                     return CupertinoTabView(
                         navigatorKey: _navigatorKeys[index],
+                        navigatorObservers: [_routeObservers[index]],
                         builder: (_) => _widgetOptions[index]);
                   },
                   tabBar: CupertinoTabBar(

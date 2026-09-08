@@ -20,6 +20,7 @@ class AlbumDetailsScreen extends StatefulWidget {
 }
 
 class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
+  final _scrollController = ScrollController();
   var _searchQuery = '';
 
   Future<List<Object>> buildRequest(dynamic albumId, {bool forceRefresh = false}) {
@@ -34,6 +35,12 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final albumId = ModalRoute.of(context)!.settings.arguments;
 
@@ -44,9 +51,10 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
 
     return Scaffold(
       body: GradientDecoratedContainer(
-        child: FutureBuilder(
-          future: buildRequest(albumId),
-          builder: (_, AsyncSnapshot<List<Object>> snapshot) {
+        child: Consumer<AlbumProvider>(
+          builder: (_, __, ___) => FutureBuilder(
+            future: buildRequest(albumId),
+            builder: (_, AsyncSnapshot<List<Object>> snapshot) {
             if (!snapshot.hasData ||
                 snapshot.connectionState == ConnectionState.active)
               return const PlayableListScreenPlaceholder();
@@ -68,6 +76,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                 if (mounted) setState(() {});
               },
               child: CustomScrollView(
+                  controller: _scrollController,
                   slivers: <Widget>[
                     AppBar(
                       headingText: album.name,
@@ -101,6 +110,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                       SliverToBoxAdapter(
                         child: PlayableListHeader(
                           playables: displayedPlayables,
+                          scrollController: _scrollController,
                           onSearchQueryChanged: (String query) {
                             setState(() => _searchQuery = query);
                           },
@@ -114,7 +124,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                   ],
               ),
             );
-          },
+            },
+          ),
         ),
       ),
     );

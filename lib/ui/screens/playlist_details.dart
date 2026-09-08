@@ -5,10 +5,11 @@ import 'package:app/models/models.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/ui/placeholders/placeholders.dart';
 import 'package:app/ui/widgets/widgets.dart';
+import 'package:app/utils/features.dart';
 import 'package:app/values/values.dart';
-import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' hide AppBar;
 import 'package:provider/provider.dart';
 
@@ -22,15 +23,8 @@ class PlaylistDetailsScreen extends StatefulWidget {
 }
 
 class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
-  late PlaylistProvider _playlistProvider;
   String _searchQuery = '';
   final _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _playlistProvider = context.read();
-  }
 
   Widget? _buildBackgroundImage(Playlist playlist, List<Playable> playables) {
     if (playlist.hasCover) {
@@ -62,9 +56,13 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final playlist = ModalRoute.of(context)!.settings.arguments as Playlist;
+    final supportsCustomOrder = Feature.customPlaylistOrder.isSupported();
     var sortConfig = AppState.get(
       'playlist.sort',
-      PlayableSortConfig(field: 'title', order: SortOrder.asc),
+      PlayableSortConfig(
+        field: supportsCustomOrder ? 'position' : 'title',
+        order: SortOrder.asc,
+      ),
     )!;
 
     return Scaffold(
@@ -85,6 +83,8 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
             final displayedPlayables =
                 playables.$sort(sortConfig).$filter(_searchQuery);
 
+            final showScrollbar = AlphabetScrollbar.shouldShow(itemCount: displayedPlayables.length, sortField: sortConfig.field, nameSortField: 'title');
+
             return PullToRefresh(
               onRefresh: () async {
                 await buildRequest(playlist.id, forceRefresh: true);
@@ -103,7 +103,12 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
                     backgroundImage: _buildBackgroundImage(playlist, playables),
                     actions: [
                       SortButton(
-                        fields: ['title', 'artist_name', 'created_at'],
+                        fields: [
+                          if (supportsCustomOrder) 'position',
+                          'title',
+                          'artist_name',
+                          'created_at'
+                        ],
                         currentField: sortConfig.field,
                         currentOrder: sortConfig.order,
                         onMenuItemSelected: (_sortConfig) {
@@ -118,6 +123,8 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
                         ? const SizedBox.shrink()
                         : PlayableListHeader(
                             playables: displayedPlayables,
+                            scrollController: _scrollController,
+                            rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                             onSearchQueryChanged: (query) {
                               setState(() => _searchQuery = query);
                             },
@@ -138,17 +145,12 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
                   else
                     SliverPlayableList(
                       playables: displayedPlayables,
-                      onDismissed: playlist.isStandard
-                          ? (playable) => _playlistProvider.removeFromPlaylist(
-                                playable,
-                                playlist: playlist,
-                              )
-                          : null,
+                      rightPadding: showScrollbar ? alphabetScrollbarWidth * 0.75 : 0,
                     ),
                   const BottomSpace(),
                 ],
               ),
-              if (AlphabetScrollbar.shouldShow(itemCount: displayedPlayables.length, sortField: sortConfig.field, nameSortField: 'title'))
+              if (showScrollbar)
                 AlphabetScrollbar(
                   labels: displayedPlayables.map((s) => s.title).toList(),
                   scrollController: _scrollController,
@@ -167,8 +169,12 @@ class _PlaylistDetailsScreen extends State<PlaylistDetailsScreen> {
 }
 
 void gotoDetailsScreen(BuildContext context, {required Playlist playlist}) {
-  Navigator.of(context, rootNavigator: true).pushNamed(
-    PlaylistDetailsScreen.routeName,
-    arguments: playlist,
-  );
+  Navigator.of(context).push(CupertinoPageRoute(
+    settings: RouteSettings(
+      name: PlaylistDetailsScreen.routeName,
+      arguments: playlist,
+    ),
+    builder: (_) => const PlaylistDetailsScreen(),
+  ));
 }
+

@@ -21,6 +21,7 @@ class PodcastDetailsScreen extends StatefulWidget {
 }
 
 class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
+  final _scrollController = ScrollController();
   String _searchQuery = '';
 
   Future<List<Object>> buildRequest(
@@ -38,6 +39,12 @@ class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final podcastId = ModalRoute.of(context)!.settings.arguments as String;
 
@@ -48,9 +55,14 @@ class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
 
     return Scaffold(
       body: GradientDecoratedContainer(
-        child: FutureBuilder(
-          future: buildRequest(podcastId),
-          builder: (_, AsyncSnapshot<List<Object>> snapshot) {
+        // Listen on PlayableProvider so a forced refresh from
+        // elsewhere (e.g. the podcast action sheet's Refresh row)
+        // triggers a rebuild — the new buildRequest call hits the
+        // freshly-repopulated cache and shows the updated episodes.
+        child: Consumer<PlayableProvider>(
+          builder: (_, __, ___) => FutureBuilder(
+            future: buildRequest(podcastId),
+            builder: (_, AsyncSnapshot<List<Object>> snapshot) {
             if (!snapshot.hasData ||
                 snapshot.connectionState == ConnectionState.active)
               return const PlayableListScreenPlaceholder();
@@ -72,6 +84,7 @@ class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
                 if (mounted) setState(() {});
               },
               child: CustomScrollView(
+                  controller: _scrollController,
                   slivers: <Widget>[
                     AppBar(
                       headingText: podcast.title,
@@ -105,6 +118,7 @@ class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
                       SliverToBoxAdapter(
                         child: PlayableListHeader(
                           playables: displayedPlayables,
+                          scrollController: _scrollController,
                           onSearchQueryChanged: (String query) {
                             setState(() => _searchQuery = query);
                           },
@@ -118,7 +132,8 @@ class _PodcastDetailsScreen extends State<PodcastDetailsScreen> {
                   ],
               ),
             );
-          },
+            },
+          ),
         ),
       ),
     );

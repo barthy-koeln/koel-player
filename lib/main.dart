@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:app/audio_handler.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/ui/app.dart';
+import 'package:app/utils/quick_actions.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
@@ -10,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 late KoelAudioHandler audioHandler;
+final quickActions = KoelQuickActions();
 
 List<SingleChildWidget> _providers = [
   Provider(create: (_) => AuthProvider()),
@@ -27,6 +29,7 @@ List<SingleChildWidget> _providers = [
   ChangeNotifierProvider(
     create: (context) => FavoriteProvider(
       playableProvider: context.read<PlayableProvider>(),
+      downloadProvider: context.read<DownloadProvider>(),
     ),
   ),
   ChangeNotifierProvider(
@@ -38,6 +41,7 @@ List<SingleChildWidget> _providers = [
     create: (context) => InteractionProvider(
       playableProvider: context.read<PlayableProvider>(),
       recentlyPlayedProvider: context.read<RecentlyPlayedProvider>(),
+      downloadProvider: context.read<DownloadProvider>(),
     ),
     // By setting lazy to false, we ensure that the provider is initialized
     // before the app is launched. This makes sure that the provider listens
@@ -102,6 +106,10 @@ Future<void> main() async {
 
   await GetStorage.init('Preferences');
   await GetStorage.init(DownloadProvider.serializedPlayableContainer);
+
+  // Register early so a cold launch via a shortcut is captured and buffered
+  // until the main screen is ready to act on it.
+  quickActions.initialize();
 
   runApp(
     MultiProvider(

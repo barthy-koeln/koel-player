@@ -1,4 +1,6 @@
 import 'package:app/constants/constants.dart';
+import 'package:app/main.dart';
+import 'package:app/mixins/stream_subscriber.dart';
 import 'package:app/models/models.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/ui/widgets/widgets.dart';
@@ -17,13 +19,14 @@ class SearchScreen extends StatefulWidget {
   _SearchScreenState createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with StreamSubscriber {
   var _hasFocus = false;
   var _initial = true;
   var _playables = <Playable>[];
   var _artists = <Artist>[];
   var _albums = <Album>[];
   var _podcasts = <Podcast>[];
+  var _radioStations = <RadioStation>[];
 
   late final SearchProvider searchProvider;
   final _controller = TextEditingController(text: '');
@@ -38,6 +41,27 @@ class _SearchScreenState extends State<SearchScreen> {
     _focusNode.addListener(() {
       setState(() => _hasFocus = _focusNode.hasFocus);
     });
+
+    // Focus the field when reached via the "Search" quick action, whether this
+    // screen was already alive or is being built as a result of the action.
+    if (quickActions.consumePendingSearchFocus()) _focusSearchField();
+    subscribe(
+      quickActions.searchFocusRequests.listen((_) => _focusSearchField()),
+    );
+  }
+
+  void _focusSearchField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    unsubscribeAll();
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   _search(String keywords) =>
@@ -56,6 +80,7 @@ class _SearchScreenState extends State<SearchScreen> {
           _albums = result.albums;
           _artists = result.artists;
           _podcasts = result.podcasts;
+          _radioStations = result.radioStations;
         });
       });
 
@@ -159,6 +184,24 @@ class _SearchScreenState extends State<SearchScreen> {
                             HorizontalCardScroller(
                               cards: _podcasts.map(
                                 (podcast) => PodcastCard(podcast: podcast),
+                              ),
+                            ),
+                        ],
+                        if (Feature.radioStations.isSupported()) ...[
+                          const SizedBox(height: 32),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: AppDimensions.hPadding,
+                            ),
+                            child: const Heading5(text: 'Radio Stations'),
+                          ),
+                          if (_radioStations.isEmpty)
+                            noResults
+                          else
+                            HorizontalCardScroller(
+                              cards: _radioStations.map(
+                                (station) =>
+                                    RadioStationCard(station: station),
                               ),
                             ),
                         ],

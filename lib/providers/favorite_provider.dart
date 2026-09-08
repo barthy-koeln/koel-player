@@ -8,9 +8,13 @@ import 'package:flutter/foundation.dart';
 class FavoriteProvider with ChangeNotifier, StreamSubscriber {
   var playables = <Playable>[];
   late final PlayableProvider _playableProvider;
+  late final DownloadProvider _downloadProvider;
 
-  FavoriteProvider({required PlayableProvider playableProvider})
-      : _playableProvider = playableProvider {
+  FavoriteProvider({
+    required PlayableProvider playableProvider,
+    required DownloadProvider downloadProvider,
+  })  : _playableProvider = playableProvider,
+        _downloadProvider = downloadProvider {
     subscribe(AuthProvider.userLoggedOutStream.listen((_) {
       playables.clear();
       notifyListeners();
@@ -35,27 +39,42 @@ class FavoriteProvider with ChangeNotifier, StreamSubscriber {
     return playables;
   }
 
-  Future<void> unlike(Playable playable) async {
-    playable.liked = false;
-    playables.remove(playable);
-    notifyListeners();
+  void _setLiked(Playable playable, bool liked) {
+    playable.liked = liked;
 
-    await post('interaction/batch/unlike', data: {
-      'songs': [playable.id],
-    });
-  }
-
-  Future<void> toggleOne({required Playable playable}) async {
-    playable.liked = !playable.liked;
-
-    if (playable.liked) {
+    if (liked) {
       playables.add(playable);
     } else {
       playables.remove(playable);
     }
 
     notifyListeners();
+  }
 
-    await post('interaction/like', data: {'song': playable.id});
+  Future<void> unlike(Playable playable) async {
+    _setLiked(playable, false);
+
+    try {
+      await post('interaction/batch/unlike', data: {
+        'songs': [playable.id],
+      });
+      _downloadProvider.persistMetadataIfNeeded(playable);
+    } catch (e) {
+      _setLiked(playable, true);
+      rethrow;
+    }
+  }
+
+  Future<void> toggleOne({required Playable playable}) async {
+    final liked = !playable.liked;
+    _setLiked(playable, liked);
+
+    try {
+      await post('interaction/like', data: {'song': playable.id});
+      _downloadProvider.persistMetadataIfNeeded(playable);
+    } catch (e) {
+      _setLiked(playable, !liked);
+      rethrow;
+    }
   }
 }

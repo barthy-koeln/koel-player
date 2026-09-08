@@ -5,7 +5,7 @@ import 'package:app/ui/widgets/widgets.dart';
 import 'package:app/utils/features.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 class LibraryScreen extends StatelessWidget {
@@ -25,66 +25,76 @@ class LibraryScreen extends StatelessWidget {
         LibraryMenuItem(
           icon: CupertinoIcons.music_note,
           label: 'Songs',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const SongsScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: SongsScreen.routeName),
+            builder: (_) => const SongsScreen(),
+          )),
         ),
         LibraryMenuItem(
-          icon: CupertinoIcons.heart_fill,
+          icon: CupertinoIcons.star_fill,
           label: 'Favorites',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const FavoritesScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: FavoritesScreen.routeName),
+            builder: (_) => const FavoritesScreen(),
+          )),
         ),
         LibraryMenuItem(
           icon: CupertinoIcons.music_note_list,
           label: 'Playlists',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const PlaylistsScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: PlaylistsScreen.routeName),
+            builder: (_) => const PlaylistsScreen(),
+          )),
         ),
         LibraryMenuItem(
           icon: CupertinoIcons.music_mic,
           label: 'Artists',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const ArtistsScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: ArtistsScreen.routeName),
+            builder: (_) => const ArtistsScreen(),
+          )),
         ),
         LibraryMenuItem(
           icon: CupertinoIcons.music_albums,
           label: 'Albums',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const AlbumsScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: AlbumsScreen.routeName),
+            builder: (_) => const AlbumsScreen(),
+          )),
         ),
         LibraryMenuItem(
           icon: CupertinoIcons.guitars,
           label: 'Genres',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const GenresScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: GenresScreen.routeName),
+            builder: (_) => const GenresScreen(),
+          )),
         ),
         if (Feature.podcasts.isSupported())
           LibraryMenuItem(
             icon: LucideIcons.podcast,
             label: 'Podcasts',
-            onTap: () => Navigator.of(context).push(
-              CupertinoPageRoute(builder: (_) => const PodcastsScreen()),
-            ),
+            onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+              settings: const RouteSettings(name: PodcastsScreen.routeName),
+              builder: (_) => const PodcastsScreen(),
+            )),
           ),
-        LibraryMenuItem(
-          icon: CupertinoIcons.antenna_radiowaves_left_right,
-          label: 'Radio',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => const RadioStationsScreen()),
+        if (Feature.radioStations.isSupported())
+          LibraryMenuItem(
+            icon: CupertinoIcons.antenna_radiowaves_left_right,
+            label: 'Radio',
+            onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+              settings: const RouteSettings(name: RadioStationsScreen.routeName),
+              builder: (_) => const RadioStationsScreen(),
+            )),
           ),
-        ),
         LibraryMenuItem(
           icon: CupertinoIcons.cloud_download_fill,
           label: 'Downloaded',
-          onTap: () => Navigator.of(context).push(
-            CupertinoPageRoute(builder: (_) => DownloadedScreen()),
-          ),
+          onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+            settings: const RouteSettings(name: DownloadedScreen.routeName),
+            builder: (_) => DownloadedScreen(),
+          )),
         ),
       ],
     ).toList();

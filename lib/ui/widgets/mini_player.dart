@@ -6,6 +6,8 @@ import 'package:app/models/models.dart';
 import 'package:app/models/playable.dart';
 import 'package:app/providers/providers.dart';
 import 'package:app/router.dart';
+import 'package:app/ui/screens/radio_now_playing.dart';
+import 'package:app/ui/widgets/now_playing_page_route.dart';
 import 'package:app/ui/widgets/widgets.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,6 +20,7 @@ import 'package:provider/provider.dart';
 class MiniPlayer extends StatefulWidget {
   static Key pauseButtonKey = UniqueKey();
   static Key nextButtonKey = UniqueKey();
+  static Key playbackErrorIconKey = UniqueKey();
 
   final AppRouter router;
 
@@ -55,6 +58,13 @@ class _MiniPlayerState extends State<MiniPlayer> with StreamSubscriber {
   void dispose() {
     unsubscribeAll();
     super.dispose();
+  }
+
+  void _openRadioNowPlaying(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).push(
+      NowPlayingPageRoute(
+          builder: (_) => const RadioNowPlayingScreen()),
+    );
   }
 
   @override
@@ -128,58 +138,61 @@ class _MiniPlayerState extends State<MiniPlayer> with StreamSubscriber {
     final station = radioPlayer.currentStation!;
 
     return _buildShell(
-      content: Row(
-        children: <Widget>[
-          // Station logo
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: station.logo != null
-                ? CachedNetworkImage(
-                    imageUrl: station.logo!,
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _radioDefaultIcon(),
-                  )
-                : _radioDefaultIcon(),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  MarqueeText(
-                    text: radioPlayer.streamTitle ?? station.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  if (radioPlayer.loading)
-                    const Text(
-                      'Connecting…',
-                      style: TextStyle(fontSize: 12, color: Colors.white54),
+      content: InkWell(
+        onTap: () => _openRadioNowPlaying(context),
+        child: Row(
+          children: <Widget>[
+            // Station logo
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: station.logo != null
+                  ? CachedNetworkImage(
+                      imageUrl: station.logo!,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => _radioDefaultIcon(),
                     )
-                  else if (radioPlayer.streamTitle != null)
-                    Text(
-                      station.name,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.white54),
+                  : _radioDefaultIcon(),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    MarqueeText(
+                      text: radioPlayer.streamTitle ?? station.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                ],
+                    if (radioPlayer.loading)
+                      const Text(
+                        'Connecting…',
+                        style: TextStyle(fontSize: 12, color: Colors.white54),
+                      )
+                    else if (radioPlayer.streamTitle != null)
+                      Text(
+                        station.name,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.white54),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-          IconButton(
-            onPressed: radioPlayer.togglePlayPause,
-            icon: Icon(
-              radioPlayer.playing
-                  ? CupertinoIcons.pause_fill
-                  : CupertinoIcons.play_fill,
-              size: 24,
+            IconButton(
+              onPressed: radioPlayer.togglePlayPause,
+              icon: Icon(
+                radioPlayer.playing
+                    ? CupertinoIcons.pause_fill
+                    : CupertinoIcons.play_fill,
+                size: 24,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -190,15 +203,12 @@ class _MiniPlayerState extends State<MiniPlayer> with StreamSubscriber {
 
     if (playable == null || state == null) return SizedBox.shrink();
 
-    late final bool isLoading;
-
-    if ((state.processingState == AudioProcessingState.buffering ||
-            state.processingState == AudioProcessingState.loading) &&
-        state.playing) {
-      isLoading = true;
-    } else {
-      isLoading = false;
-    }
+    final isLoading = state.playing &&
+        (state.processingState == AudioProcessingState.buffering ||
+            state.processingState == AudioProcessingState.loading);
+    final hasFailed = state.processingState == AudioProcessingState.error;
+    final overlayDimension =
+        PlayableThumbnail.dimensionForSize(ThumbnailSize.xs);
 
     return _buildShell(
       content: InkWell(
@@ -216,12 +226,9 @@ class _MiniPlayerState extends State<MiniPlayer> with StreamSubscriber {
                         playable: playable,
                       ),
                     ),
-                    if (isLoading)
+                    if (isLoading || hasFailed)
                       SizedBox.square(
-                        dimension:
-                            PlayableThumbnail.dimensionForSize(
-                          ThumbnailSize.xs,
-                        ),
+                        dimension: overlayDimension,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.all(
@@ -237,12 +244,20 @@ class _MiniPlayerState extends State<MiniPlayer> with StreamSubscriber {
                       ),
                     if (isLoading)
                       SizedBox.square(
-                        dimension:
-                            PlayableThumbnail.dimensionForSize(
-                          ThumbnailSize.xs,
-                        ),
+                        dimension: overlayDimension,
                         child: SpinKitThreeBounce(
                             color: AppColors.white, size: 16),
+                      ),
+                    if (hasFailed)
+                      SizedBox.square(
+                        dimension: overlayDimension,
+                        child: Icon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          key: MiniPlayer.playbackErrorIconKey,
+                          semanticLabel: "Couldn't play this song",
+                          color: AppColors.white,
+                          size: 16,
+                        ),
                       ),
                   ],
                 ),
